@@ -1,0 +1,28 @@
+# Git repository files
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+
+# Jenkins files
+Jenkinsfile
+
+# Documentation / Project files not needed in image
+README.md
+# Add any other project config files you don't want in the image
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Build artifacts or local dependencies (if any)
+# node_modules
+# build/
+# dist/

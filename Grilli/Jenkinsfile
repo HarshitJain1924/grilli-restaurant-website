@@ -1,0 +1,94 @@
+pipeline {
+    agent any // Run on any available agent/node (ensure this agent has Docker access)
+
+    environment {
+        // !! Replace 'your-dockerhub-username' with your actual Docker Hub username !!
+        DOCKERHUB_USERNAME = 'harshitjain1924'
+        IMAGE_NAME = "${env.DOCKERHUB_USERNAME}/grilli-website"
+        // Use build number for unique tagging, or 'latest'
+        IMAGE_TAG = "build-${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout the source code from GitHub (root of the repo)
+                git url: 'https://github.com/HarshitJain1924/grilli-restaurant-website.git', branch: 'main' // Or your default branch
+                script {
+                    // Print current commit hash (optional)
+                    def commitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    echo "Checked out commit: ${commitHash}"
+                    // Verify structure (optional)
+                    echo "Listing files in workspace:"
+                    sh 'ls -la'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "Building Docker image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+                // Build the image using the Dockerfile in the current directory (.)
+                // Docker automatically uses the .dockerignore file in the same directory
+                sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
+
+                // Optionally, also tag as 'latest'
+                sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.IMAGE_NAME}:latest"
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo "Pushing image ${env.IMAGE_NAME} to Docker Hub..."
+                // Use the Docker Hub credentials stored in Jenkins (ID: dockerhub-creds)
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    // Log in to Docker Hub
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+
+                    // Push the image with the build number tag
+                    sh "docker push ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+
+                    // Push the 'latest' tag
+                    sh "docker push ${env.IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        // Optional: Stage to run the container locally for testing on the agent
+        // stage('Run Container Locally (Optional)') {
+        //     steps {
+        //         echo "Stopping and removing any existing container named grilli-app..."
+        //         // Stop and remove container if it exists to avoid conflicts
+        //         sh "docker stop grilli-app || true"
+        //         sh "docker rm grilli-app || true"
+        //
+        //         echo "Running new container from ${env.IMAGE_NAME}:latest..."
+        //         // Run the new container in detached mode (-d), map host port 8081 to container port 80 (-p 8081:80)
+        //         // Changed port to 8081 to avoid potential conflict with Jenkins on 8080
+        //         sh "docker run -d --name grilli-app -p 8081:80 ${env.IMAGE_NAME}:latest"
+        //         echo "Website should be available at http://<your-jenkins-agent-ip>:8081"
+        //     }
+        // }
+    }
+
+    post {
+        always {
+            // Clean up: Log out from Docker Hub
+            echo "Logging out from Docker Hub..."
+            sh "docker logout"
+
+            // Optional: Clean up built image from Jenkins agent's Docker
+            // echo "Cleaning up local Docker image on agent..."
+            // sh "docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true"
+            // sh "docker rmi ${env.IMAGE_NAME}:latest || true"
+        }
+        success {
+            echo 'Pipeline successful!'
+            // Add notifications (Slack, Email) here if desired
+        }
+        failure {
+            echo 'Pipeline failed.'
+            // Add failure notifications here
+        }
+    }
+}
