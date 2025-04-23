@@ -4,15 +4,14 @@ FROM nginx:alpine
 # Remove the default nginx website content
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy website assets, index, favicon etc. from the build context root
-# Assumes 'assets', 'index.html', 'favicon.svg' are in the same directory as the Dockerfile
+# Copy website files FROM the directory containing this Dockerfile (Grilli/)
+# into the nginx web root inside the container.
 COPY assets/ /usr/share/nginx/html/assets/
 COPY index.html /usr/share/nginx/html/
 COPY favicon.svg /usr/share/nginx/html/
-# Add COPY lines here if you have other essential website root files/folders
+# Add other files if needed, relative to the Grilli/ directory
 
-# Expose port 80 (the default nginx port)
+# Expose port 80
 EXPOSE 80
 
-# The default nginx command starts the server, no explicit CMD needed for this base image
-# CMD ["nginx", "-g", "daemon off;"] is the default
+# Default nginx command starts the server

@@ -1,10 +1,9 @@
 pipeline {
-    // agent any // Remove or comment out this line
     agent {
         docker {
             image 'docker:latest' // Use an image that has the Docker CLI
-            // If needed (depends on setup), ensure socket access for agent:
-            // args '-v /var/run/docker.sock:/var/run/docker.sock'
+            // Explicitly map the socket for the agent
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
 
@@ -16,19 +15,22 @@ pipeline {
     }
 
     stages {
-        // ... rest of your stages (Checkout, Build, Push) remain the same ...
-         stage('Checkout') {
+        stage('Checkout') {
+            // This stage now runs inside the docker agent container
+            // Jenkins automatically checks out before starting the agent,
+            // but an explicit step ensures we are in the right state.
             steps {
-                // Checkout the source code from GitHub (root of the repo)
-                // Note: Checkout usually happens automatically before agent starts
-                // but explicit checkout inside agent can also work if needed.
-                // Keeping your existing checkout step here:
-                git url: 'https://github.com/HarshitJain1924/grilli-restaurant-website.git', branch: 'main'
+                // We check out the whole repository into the workspace root
+                checkout scm
                 script {
                     def commitHash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     echo "Checked out commit: ${commitHash}"
-                    echo "Listing files in workspace:"
-                    sh 'ls -la'
+                    echo "Listing files in workspace root:"
+                    // The '.' directory will be the workspace root
+                    sh 'ls -la .'
+                    echo "Listing files in Grilli/ subdirectory:"
+                    // Check if the Grilli subdirectory and its contents exist
+                    sh 'ls -la Grilli/'
                 }
             }
         }
@@ -36,7 +38,12 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                sh "docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
+                // IMPORTANT CHANGE:
+                // Use '-f' to specify the path to the Dockerfile
+                // The '.' at the end specifies the build context (the workspace root)
+                sh "docker build -f Grilli/Dockerfile -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} ."
+
+                // Tagging as latest remains the same
                 sh "docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.IMAGE_NAME}:latest"
             }
         }
@@ -56,10 +63,8 @@ pipeline {
     post {
          always {
             echo "Logging out from Docker Hub..."
-            // This will now run inside the docker:latest agent
             sh "docker logout"
          }
-        // ... success / failure blocks ...
         success {
             echo 'Pipeline successful!'
         }
