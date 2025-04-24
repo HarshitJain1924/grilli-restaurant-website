@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'docker:latest' // Use an image that has the Docker CLI
+            image 'docker:20.10.24-dind' // Use an image that has the Docker CLI
             // Explicitly map the socket for the agent
             args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
